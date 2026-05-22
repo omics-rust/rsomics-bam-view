@@ -6,7 +6,10 @@ fn bin() -> Command {
 }
 
 fn fixture() -> &'static Path {
-    Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/golden/small.bam"))
+    Path::new(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/golden/small.bam"
+    ))
 }
 
 fn samtools_available() -> bool {
@@ -33,7 +36,11 @@ fn samtools_count(args: &[&str]) -> u64 {
 
 fn ours_count(args: &[&str]) -> u64 {
     let out = bin().args(args).arg("-c").arg(fixture()).output().unwrap();
-    assert!(out.status.success(), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     String::from_utf8_lossy(&out.stdout).trim().parse().unwrap()
 }
 
