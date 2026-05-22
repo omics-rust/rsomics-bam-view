@@ -1,6 +1,4 @@
-use std::fs::File;
 use std::io::Write;
-use std::num::NonZero;
 use std::path::Path;
 
 use noodles::bam;
@@ -30,20 +28,8 @@ fn passes(flags: sam::alignment::record::Flags, mapq: Option<u8>, f: &ViewFilter
     true
 }
 
-/// BAM reader whose BGZF blocks are inflated across a worker pool. samtools
-/// inflates on one thread by default, so a parallel decode is the lever that
-/// puts a pure-Rust reader ahead of it on multi-core hosts.
-fn open_parallel(input: &Path) -> Result<bam::io::Reader<bgzf::io::MultithreadedReader<File>>> {
-    let file = File::open(input)
-        .map_err(|e| RsomicsError::InvalidInput(format!("{}: {e}", input.display())))?;
-    let workers = std::thread::available_parallelism().unwrap_or(NonZero::<usize>::MIN);
-    Ok(bam::io::Reader::from(
-        bgzf::io::MultithreadedReader::with_worker_count(workers, file),
-    ))
-}
-
 pub fn view_bam(input: &Path, output: &mut dyn Write, filter: &ViewFilter) -> Result<u64> {
-    let mut reader = open_parallel(input)?;
+    let mut reader = rsomics_bamio::open_parallel(input)?;
     let header = reader.read_header().map_err(RsomicsError::Io)?;
 
     if filter.count_only {
