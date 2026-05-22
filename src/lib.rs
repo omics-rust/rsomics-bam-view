@@ -31,7 +31,7 @@ fn passes(flags: sam::alignment::record::Flags, mapq: Option<u8>, f: &ViewFilter
 
 pub fn view_bam(
     input: &Path,
-    output: &mut dyn Write,
+    output_path: Option<&Path>,
     filter: &ViewFilter,
     workers: NonZero<usize>,
 ) -> Result<u64> {
@@ -42,8 +42,27 @@ pub fn view_bam(
         return count_bam(&mut reader, filter);
     }
 
-    let mut writer = bam::io::Writer::new(output);
-    writer.write_header(&header).map_err(RsomicsError::Io)?;
+    // File output uses bamio's multithreaded BGZF writer (libdeflate); stdout
+    // falls back to the single-threaded writer.
+    match output_path {
+        Some(path) => {
+            let mut writer = rsomics_bamio::create_with_workers(path, workers)?;
+            write_filtered(&mut reader, &mut writer, &header, filter)
+        }
+        None => {
+            let mut writer = bam::io::Writer::new(std::io::stdout().lock());
+            write_filtered(&mut reader, &mut writer, &header, filter)
+        }
+    }
+}
+
+fn write_filtered<W: Write>(
+    reader: &mut rsomics_bamio::ParallelBamReader,
+    writer: &mut bam::io::Writer<W>,
+    header: &sam::Header,
+    filter: &ViewFilter,
+) -> Result<u64> {
+    writer.write_header(header).map_err(RsomicsError::Io)?;
 
     let mut count: u64 = 0;
     for result in reader.records() {
@@ -56,7 +75,7 @@ pub fn view_bam(
         }
         count += 1;
         writer
-            .write_record(&header, &record)
+            .write_record(header, &record)
             .map_err(RsomicsError::Io)?;
     }
     Ok(count)

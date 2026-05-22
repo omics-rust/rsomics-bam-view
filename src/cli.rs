@@ -56,15 +56,11 @@ impl Cli {
             count_only: self.count_only,
         };
 
-        let mut out: Box<dyn std::io::Write> = if self.output == "-" {
-            Box::new(std::io::stdout().lock())
-        } else {
-            Box::new(std::fs::File::create(&self.output).map_err(RsomicsError::Io)?)
-        };
+        let output_path = (self.output != "-").then(|| std::path::PathBuf::from(&self.output));
 
         let workers = std::num::NonZero::new(self.common.thread_count())
             .unwrap_or(std::num::NonZero::<usize>::MIN);
-        let count = view_bam(&self.input, &mut out, &filter, workers)?;
+        let count = view_bam(&self.input, output_path.as_deref(), &filter, workers)?;
 
         if self.count_only {
             use std::io::Write;
