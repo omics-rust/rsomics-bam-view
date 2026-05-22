@@ -1,8 +1,10 @@
 use std::fs::File;
 use std::io::Write;
+use std::num::NonZero;
 use std::path::Path;
 
 use noodles::bam;
+use noodles::bgzf;
 use noodles::sam;
 use rsomics_common::{Result, RsomicsError};
 
@@ -28,10 +30,20 @@ fn passes(flags: sam::alignment::record::Flags, mapq: Option<u8>, f: &ViewFilter
     true
 }
 
-pub fn view_bam(input: &Path, output: &mut dyn Write, filter: &ViewFilter) -> Result<u64> {
+/// BAM reader whose BGZF blocks are inflated across a worker pool. samtools
+/// inflates on one thread by default, so a parallel decode is the lever that
+/// puts a pure-Rust reader ahead of it on multi-core hosts.
+fn open_parallel(input: &Path) -> Result<bam::io::Reader<bgzf::io::MultithreadedReader<File>>> {
     let file = File::open(input)
         .map_err(|e| RsomicsError::InvalidInput(format!("{}: {e}", input.display())))?;
-    let mut reader = bam::io::Reader::new(file);
+    let workers = std::thread::available_parallelism().unwrap_or(NonZero::<usize>::MIN);
+    Ok(bam::io::Reader::from(
+        bgzf::io::MultithreadedReader::with_worker_count(workers, file),
+    ))
+}
+
+pub fn view_bam(input: &Path, output: &mut dyn Write, filter: &ViewFilter) -> Result<u64> {
+    let mut reader = open_parallel(input)?;
     let header = reader.read_header().map_err(RsomicsError::Io)?;
 
     if filter.count_only {
@@ -58,10 +70,10 @@ pub fn view_bam(input: &Path, output: &mut dyn Write, filter: &ViewFilter) -> Re
     Ok(count)
 }
 
-fn count_bam<R: std::io::Read>(
-    reader: &mut bam::io::Reader<noodles::bgzf::io::Reader<R>>,
-    filter: &ViewFilter,
-) -> Result<u64> {
+fn count_bam<R>(reader: &mut bam::io::Reader<R>, filter: &ViewFilter) -> Result<u64>
+where
+    R: bgzf::io::BufRead + bgzf::io::Seek,
+{
     let mut count: u64 = 0;
     for result in reader.records() {
         let record = result.map_err(RsomicsError::Io)?;
