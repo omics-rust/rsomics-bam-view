@@ -62,7 +62,9 @@ impl Cli {
             Box::new(std::fs::File::create(&self.output).map_err(RsomicsError::Io)?)
         };
 
-        let count = view_bam(&self.input, &mut out, &filter)?;
+        let workers = std::num::NonZero::new(self.common.thread_count())
+            .unwrap_or(std::num::NonZero::<usize>::MIN);
+        let count = view_bam(&self.input, &mut out, &filter, workers)?;
 
         if self.count_only {
             use std::io::Write;

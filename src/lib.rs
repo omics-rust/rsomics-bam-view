@@ -1,4 +1,5 @@
 use std::io::Write;
+use std::num::NonZero;
 use std::path::Path;
 
 use noodles::bam;
@@ -28,8 +29,13 @@ fn passes(flags: sam::alignment::record::Flags, mapq: Option<u8>, f: &ViewFilter
     true
 }
 
-pub fn view_bam(input: &Path, output: &mut dyn Write, filter: &ViewFilter) -> Result<u64> {
-    let mut reader = rsomics_bamio::open_parallel(input)?;
+pub fn view_bam(
+    input: &Path,
+    output: &mut dyn Write,
+    filter: &ViewFilter,
+    workers: NonZero<usize>,
+) -> Result<u64> {
+    let mut reader = rsomics_bamio::open_with_workers(input, workers)?;
     let header = reader.read_header().map_err(RsomicsError::Io)?;
 
     if filter.count_only {
