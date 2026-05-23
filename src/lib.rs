@@ -3,7 +3,6 @@ use std::num::NonZero;
 use std::path::Path;
 
 use noodles::bam;
-use noodles::bgzf;
 use noodles::sam;
 use rsomics_common::{Result, RsomicsError};
 
@@ -83,7 +82,7 @@ fn write_filtered<W: Write>(
 
 fn count_bam<R>(reader: &mut bam::io::Reader<R>, filter: &ViewFilter) -> Result<u64>
 where
-    R: bgzf::io::BufRead + bgzf::io::Seek,
+    R: std::io::Read,
 {
     let mut count: u64 = 0;
     for result in reader.records() {
