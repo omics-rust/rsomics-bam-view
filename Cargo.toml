@@ -12,6 +12,11 @@ description = "View, filter, and convert SAM/BAM/CRAM alignments — Rust port o
 name = "rsomics-bam-view"
 path = "src/main.rs"
 
+
+[lib]
+name = "rsomics_bam_view"
+path = "src/lib.rs"
+doctest = false
 [dependencies]
 rsomics-common = { version = "0.6" }
 rsomics-help = { version = "0.3" }
